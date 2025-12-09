@@ -93,23 +93,35 @@ exports.getFormResponses = async (req, res) => {
 };
 
 
-
-// guest apis
 exports.getFormByToken = async (req, res) => {
   try {
     const { token } = req.params;
     
     const accessRecord = await FormGuest.findOne({ token })
-      .populate('formId', 'title adminNote fields')
+      .populate('formId', 'title adminNote fields expiresAt') 
       .populate('guestId', 'name');
 
     if (!accessRecord) {
       return res.status(404).json({ message: 'Invalid or expired access token.' });
     }
+
     if (accessRecord.isSubmitted) {
-      return res.status(403).json({ message: 'This form has already been submitted.' });
+      return res.status(200).json({ 
+         status: 'submitted',
+         message: 'Response already recorded' 
+      });
     }
+
+    if (accessRecord.formId.expiresAt && new Date() > new Date(accessRecord.formId.expiresAt)) {
+      return res.status(410).json({
+        status: 'expired',
+        message: 'The deadline for this form has passed.',
+        formTitle: accessRecord.formId.title
+      }); 
+    }
+
     res.json({
+      status: 'active',
       form: accessRecord.formId,
       guestName: accessRecord.guestId.name,
       formGuestId: accessRecord._id
@@ -119,6 +131,11 @@ exports.getFormByToken = async (req, res) => {
     res.status(500).json({ message: 'Error retrieving form', error: err.message });
   }
 };
+
+exports.deleteForm = async (req , res) => {
+  const { formId } = req.params;
+  
+}
 
 exports.submitFormResponse = async (req, res) => {
   const { formId } = req.params;
